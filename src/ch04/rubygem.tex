@@ -1,0 +1,32 @@
+\section{Smartcard Access Extension to Ruby}\label{impl:rubygem}
+I have implemented a Ruby extension that provides access to PC/SC smart card
+readers, and was tested to work on Windows XP and Vista, Mac OS X Tiger and
+Leopard, as well as Ubuntu Linux versions 7.10 and 8.04. The extension is
+packaged using RubyGems \cite{berube2007forge}, the de-facto Ruby software
+packaging standard. The extension has been placed under the MIT license, and
+released on the Rubyforge site \cite{berube2007forge}, which makes the gem
+readily avaible on any RubyGems-enabled Ruby interpreter, via the command
+\texttt{gem install smartcard} .
+
+\subsubsection{Motivation}
+The first TEM driver was implemented in Java. The choice seemed natural, as my
+JavaCard IDE came with Java libraries that interacted with the cards. However,
+Java's lack of advanced language features makes it inadequate for assembling
+SECpacks. Writing a proper assembler would have required a lot of effort, and
+assembling SECpacks by hand became unattractive once I started using complex
+SECpacks. This impacted research negatively, as I had less enthusiasm to
+experiment.
+
+The opportunity for tossing away the Java code presented itself when a
+requirement was introduced that the TEM's demo software must be able to run on
+both Mac OS X, and Linux. Java's libraries for smart card access were not well
+developed for Mac OS X, so at that point it became reasonable to invest effort
+into writing a Ruby extension, as opposed to a Java JNI library.
+
+\subsubsection{Features}
+When running under Windows, the gem uses the native PC/SC access library,
+\texttt{winscard}. Under Linux or Mac OS X, the gem uses the \texttt{pcsclite}
+library, which is a free port of a subset of \texttt{winscard}. All the
+functions in \texttt{pcsclite} are exposed using an object-oriented interface,
+and the gem code works around the peculiarities\footnote{bugs} in the PC/SC
+implementations it targets.

@@ -1,0 +1,352 @@
+\section{Persistent Store}\label{arch:pstore}
+The persistent store is an associative memory backing the values of
+mutable non-local variables for all the closures executing on the TEM. Section
+\ref{concepts:pstore} argues that the most appropriate design is to identify
+variables by addresses that are as large as cryptographic hashes, and use the
+knowledge of a value's address as proof of authorization to access that
+variable.
+
+The conceptual presentation of the persistent store leaves out the following
+issues:
+\begin{itemize}
+  \item the operations supported by the persistent store,
+  \item the nature of the values in the store,
+  \item the method for assigning an address to a variable, and
+  \item bridging the gap between the possibility of executing a large number of
+  SECpacks, and the small amount of non-volatile memory in the low-cost secure
+  chips that the TEM targets.
+\end{itemize}
+The omission is deliberate, as the answers to these questions are engineering
+trade-offs, and would have detracted from the understanding of the concept. This
+section provides answers that are appropriate in the context of the TEM
+architecture.
+
+\subsection{Persistent Store Operations}
+In the absence of a contrary reason, the persistent store provides the standard
+associative memory operations:
+\begin{itemize}
+  \item \texttt{read(address)} returns the value stored at \texttt{address}, or
+  a special \textsc{nothing} value if the persistent store does not have an
+  association for the given address.
+  \item \texttt{write(value, address)} writes \texttt{value} at
+  \texttt{address}. \texttt{write} overwrites the old value stored at the given
+  address, or creates a new association for \texttt{address}, and returns
+  \textsc{created} or \textsc{updated} to reflect what happened. The return
+  value is not relevant for a general understanding of the TEM archiecture, but
+  it is needed in section \ref{arch:pstore_external}.
+  \item \texttt{remove(address)} removes the value associated with
+  \texttt{address}, if such an association existed.
+\end{itemize}
+
+\subsection{Persistent Store Values}
+All the values in the TEM's persistent store are the size of the hashes
+produced by the TEM's cryptographic engine (section \ref{arch:crypto_hash}).
+
+Using fixed-size variables is essential to avoid complexity in the persistent
+store implementation. Furthermore, an implementation that provides
+variable-size values will end up using most (if not all) of the saved memory on
+the bookkeeping required to make variable lookup fast.
+
+The reasoning behind the chosen size requires some understanding of the TEM's
+execution engine, described in section \ref{arch:execution}. The unique memory
+space and the stack-based instruction set suggest a single attractive
+alternative to the choices of value size: the size of a machine word. This
+choice would make programming a bit more convenient, because it would be
+possible to read a persistent store value directly onto the stack, or write
+calculation results directly from the stack to the persistent store.
+
+However, word-sized values  would cause memory waste, because a persistent
+store value would be much smaller\footnote{The chips suitable for the TEM at
+the time of this writing have a word size of 16 bits, whereas a SHA-1 hash
+takes 160 bits.} than its address, so most of the memory would be spent on
+addresses.
+
+Furthermore, larger persistent store values can translate into speed benefits.
+Closure compilers can bundle multiple variable values into the same persistent
+store entry, in order to optimize speed. This will always yield benefits,
+because reading/writing from/to the persistent store implies NVRAM, and
+therefore is bound to be slower than multiplexing values in a closure's
+RAM-backed memory space.
+
+In conclusion, making persistent store values approximately the same size
+as addresses makes sense for the TEM. The slight increase in complexity for the
+closure compiler is rewarded by increased SECpack execution speed, and
+better memory utilization.
+
+\subsection{Persistent Store Address Allocation}\label{arch:ps_alloc}
+The size of persistent store addresses must be at least as large as a symmetric
+encryption key (section \ref{concepts:pstore}). This allows the following
+allocation strategy: randomly choosing a persistent store address allocates that
+address on all the TEMs in the world. Address allocation is used to mean that
+no other closure will use the same address for a different variable. Address
+allocation does not imply memory allocation on any TEM.
+
+This strategy has the advantages that a variable has the same address on all
+TEMs, and that address allocation can be done off-line. On the other hand, the
+method's robustness is not immediately obvious, and guaranteeing integrity
+against replay attacks is non-trivial. An argument for the method's robustness
+is provided below. The discussion on preventing replay attacks is complex
+enough that it has been assigned to its own section \ref{arch:pstore_freshness}.
+
+\subsubsection{Robustness Argument}
+Allocating an address uses the same mechanism as generating a symmetric
+encryption key. Addresses are large enough that the chance of a conflict is not
+bigger than the chance of generating an encryption key that belongs to someone
+else. Most of the world's economy relies on symmetric encryption, as banks
+communicate with each other using SSL \cite{freier1996ssl} or TLS
+\cite{dierks1999tpv}, which in turn use symmetric encryption.
+
+An argument similar to that in section \ref{concepts:pstore_auth} can be
+used to show that the probability of having an attacker break the TEM trust
+chain is much greater than the probability of having two SECpacks on the same
+TEM that use the same address for different variables.
+
+In closing it is worth noting that increasingly many systems rely on UUIDs
+(Universally Unique Identifiers) \cite{leach2005ruu} for what is
+essentially off-line address allocation. Using a hardware random number
+generator to allocate a persistent store address is stronger than
+the pseudo-random UUID allocation algorithm proposed in \cite{leach2005ruu}.
+It is assumed that a SEClosure author has access to a good hardware RNG.
+
+\subsection{Guaranteeing the Freshness in the Persistent
+Store}\label{arch:pstore_freshness}
+Guaranteeing freshness when the persistent store addresses are allocated 
+offline requires some thought. It is non-trivial for a SEClosure to distinguish
+between the case when its mutable non-local variables have never been used on a
+TEM (and thus should be assumed to contain default values), and the case when
+its variables have been assigned values, but the corresponding associations
+have been \texttt{remove}d from the persistent store. The possibility of
+confusing the two cases can be exploited by replay attacks.
+
+\subsubsection{Preventing Replay Attacks: the Easy Way}
+The straightforward method of eliminating the ambiguity is to specify
+that once a persistent store association is created, it persists for the
+lifetime of the TEM. In other words, the operation \texttt{remove} is forbidden.
+
+When adopting this solution, the following concerns need to be addressed:
+\begin{itemize}
+  \item the persistent store grows proportionally to the number of
+  non-local mutable variables used by SECpacks throughout the life of the TEM,
+  and
+  \item malicious SECpacks can initiate a denial of service attack by filling
+  up the persistent store.
+\end{itemize}
+
+However, this solution is easier to understand and implement, so it may be more
+desirable in some situations. All off the issues above can be worked around.
+
+The persistent store entries can be stored in untrusted memory (as explained in
+section \ref{arch:pstore_external}), and the capacities of both hard disks and
+flash memories has been increasing at a rate that exceeds Moore's law. Denial of
+service attacks can be prevented by placing a hard limit on the number of new
+persistent store variables can be used by a SECpack.
+
+\subsubsection{Preventing Replay Attacks: the Painful but Efficient Way}
+The method of preventing replay attacks explained above is easy to understand,
+but has a potential drawback in that all the non-local mutable variables
+used on a TEM must persist forever, even if the SECpacks referencing them
+will never be executed again. This section describes a more complex method for
+preventing replay attacks that allows unused values to be \texttt{remove}d from
+the TEM. The presentation requires a significantly deeper understanding of the
+TEM as a whole, and is not as self-contained as the previous section.
+
+The problem of preventing replay attacks can be reduced to avoiding the replay
+of the initialization of the persistent store variables. This is because normal
+SECpacks assume that the relevant mutable non-local variables have been
+initialized prior to execution, so persistent store \texttt{read}s will never
+return \textsc{nothing}. If this assumption is broken, a SECpack aborts its
+execution and does not return any information  o the TEM owner. 
+
+The only computation that is vulnerable to replay attacks is now the
+initialization of persistent store variables. At-most-once semantics can be
+provided for initializations by linking them to a monotonic counter inside the
+TEM. This approach requires that a single value, the monotonic counter, has to
+persis throughout the lifetime of the TEM. The rest of the section explains
+the idea in more detail.
+
+Let an \textbf{object}\footnote{Object-Oriented Programming is used to simplify
+the presentation. However, the mechanism presented here can be easily
+adapted to other programing paradigms.} be a group of SECpacks that use the
+same mutable non-local variables. For convenience, an object's \textbf{fields}
+shall be all the mutable non-local variables used by the SECpacks in the
+object. Using the bank account example in section \ref{concepts:closures}, an
+individual bank account is an object, and it consists of the SECpacks labeled
+\texttt{withdraw}, \texttt{deposit}, \texttt{balance}, and \texttt{number}. The
+bank account has one field, the variable \texttt{balance} (\texttt{number} is
+optimized away by the closure compiler because it is de-facto immutable).
+
+To reduce complexity, the lifetime of all the fields of an object are managed
+at once, and management follows the same principles as constructors and
+destructors (also named finalizers). Namely, an object is \textbf{constructed}
+on a TEM by assigning initial values to all its fields. An object is
+\textbf{destroyed} by \texttt{remove}-ing the values of its fields from the
+persistent store. The SECpacks in an object will abort execution if any of
+the fields they reference do not have a value in the persistent store,
+because that means the TEM owner destroyed the object prematurely.
+
+\subsubsection{Preventing Replay Attacks on Object Construction}
+The solution is completed by ensuring that an object is constructed at most
+once. A simple mechansim that achieves this goal is described below.
+
+The mechanism uses a single monotonic counter, $\mathcal{M}_C$. The monotonic
+counter's value is stored in the persistent store, at an address known only to
+privileged SECpacks (described in section \ref{arch:key_store}). 
+
+Constructing an object is achieved series of assignments to persistent store
+addresses. The object's owner can construct a list of (address, value) tuples
+that completely capture this information. This list is referred to as the
+\textbf{constructor table}. 
+
+Yu follows the following steps to produce an object that Mii can use on his
+TEM:
+\begin{enumerate}
+	\item Mii runs a privileged SECpack that returns the value of
+	$\mathcal{M}_C$, signed with the TEM's Private Endorsement Key, $r_v =
+	\mathcal{M_C} || Enc_\textrm{PrivEK}(h(\mathcal{M}_C))$.
+	\item Mii gives Yu $r_v$, the result of reading the
+	counter, together with the TEM's Endorsement Certificate.
+	\item Yu verifies ECert and the signature, to make sure that
+	the Public Endorsement Key in the certificate can be trusted, and that
+	the value of $\mathcal{M}_C$ is authentic.
+	\item Yu binds the object's SECpacks to the TEM using PubEK,
+	and also encrypts the \textbf{constructor data}, which is the constructor table
+	together with the value of $\mathcal{M}_C$ that was verified in the previous step. The results produced
+	at this step are given to Mii.
+	\item Mii runs a privileged SECpack that decrypts the constructor data using
+	PrivEK, and verifies that the value of $\mathcal{M}_C$ matches the value in
+	the constructor data. If the verification is completed, then the SECpack
+	carries out the \texttt{write}s described in the constructor table, and
+	increments $\mathcal{M}_C$.
+\end{enumerate}
+
+It is easy to see that the process above does not allow an object
+to be constructed twice -- exactly one object is constructed for a certain
+value of $\mathcal{M}_C$. Guaranteeing that Mii cannot replay the constructor
+assignments translates into guaranteeing freshness for the fields of an
+object, which are, by definition, all the values that SECpacks will read
+from the persistent store.
+
+\subsection{Secure External Memory: The World in a
+Nutshell}\label{arch:pstore_external}
+Section \ref{concepts:pstore} explains that the persistent store must protect
+its contents from attempts of bypassing the associative memory interface.
+This leads to the straightforward implementation of storing all the
+associations in non-volatile memory shielded by the TEM's tamper-resistant
+envelope. Unfortunately, secure NVRAM is expensive, so it does not come in
+abundance on the low-cost chips that the TEM targets. This section analyzes the
+possibility of using untrusted memory outside the TEM's secure envelope, which
+is significantly less expensive.
+
+The TEM uses the approach to external secure memory introduced by the AEGIS
+\cite{suh2003aat} secure processor, which leverages Merkle trees
+\cite{merkle1980ppk}. The persistent store's external memory design adapts the
+maintainance algorithms to the TEM scenario (a low-cost chip attached to a
+powerful, but untrusted processor), and modifies the design slightly to obtain a
+hash tree whose height is logarithmically proportional to the number of
+associations inside the TEM, and not to the size of the addressing space.
+
+Like AEGIS \cite{suh2003aat}, the persistent store relies on building a tree,
+where the leaves store the actual associations, and internal nodes store a
+cryptographic hash of their children\footnote{Optimized designs that allow
+internal nodes to store associations together with the hash of their children are
+reasonably straightforward.}. The tree's root must be stored in NVRAM inside the
+TEM's secure envelope, but all the other nodes can be stored in untrusted memory.
+
+In order to ensure the integrity and confidentiality of the data, neither the
+persistent store addresses nor the values can be stored ``in the clear'' in
+untrusted memory. A symmetric encryption key\footnote{The symmetric
+key never leaves the TEM, and can be generated cheaply using a PUF
+\cite{gassend2002spr}. }\footnote{If the law does not allow symmetric encryption, an asymmetric key is used instead. Note that the persistent store becomes painfully inefficient in this case.} that is also stored inside the TEM's NVRAM is used to encrypt the associations. The
+two parts of an association must be encrypted individually, so that the TEM can
+later ask for an association by its encrypted address. This external
+representation is used for computing the hashes in the internal nodes, so the
+contents of the internal nodes are not confidential.
+
+The TEM's host (with a powerful but untrusted processor) is responsible for
+maintaining the tree structure. When a persistent store \texttt{read} is
+issued, the TEM communicates the encrypted persistent store address to the
+host. The host responds with the encrypted value associated with the
+address, together with a proof of correctness consisting of the contents of all
+the intermediary nodes. A \texttt{write} is handled similarly, except that the
+correctness proof also describes the updates that must be performed to the
+tree.
+
+\subsubsection{Amnesia and Replay Attacks}
+The tree used for external memory storage is said to exhibit
+\textbf{amnesia} if it is possible for the TEM's host, who is managing the tree,
+to ``forget'' about a persistent store association. The host would tell the
+TEM that an entry does not exist, when in fact it does. Assuming the persistent
+store implementation mistakenly believes the owner, the net result would be
+that a \texttt{read} could return \textsc{nothing} when it should return a
+value, and a \texttt{write} could return \textsc{created} instead of
+\textsc{updated}.
+
+An external memory tree exhibiting amnesia is \textbf{acceptable} if the
+persistent store design, as a whole, can be used to detect the wrong answers
+that can be originated by amnesia and report that the external tree has been
+compromised.
+
+Amnesia is important for the persistent store design. External
+memory trees that are guaranteed to either provide the correct answer or
+exhibit amnesia have a much simpler structure than trees that must provde the
+correct answer, without the possibility of amnesia. If amnesia is not
+acceptable, then the external tree sturcture must allow the TEM's host to
+construct a prof that a tree contains no association for a given address. On
+the other hand, if amnesia is allowed, then the host computer can structure the
+tree as it wishes, and it does not need to provide a proof when claiming that
+the tree does not contain any association for a certain address.
+
+A necessary, but not sufficient, condition for amnesia to be acceptable is that
+the correct return value of a \texttt{write} (\textsc{created} or
+\textsc{updated}) is known in advance. In other words, whenever a variable is
+assigned a value, the persistent store should know whether the store already
+contains a corresponding association or not. Otherwise, the host can trick the
+TEM into creating two leaves for the same association, and later lead the TEM
+to the leaf corresponding to a stale value.
+
+The method of guaranteeing persistent store freshness (section
+\ref{arch:pstore_freshness}) determines if amnesia is acceptable. For example,
+the straigthforward method described at the beginning of section
+\ref{arch:pstore_freshness} requires the guarantee that the persistent store
+will not exhibit amnesia, because its correctness relies on receiving the
+correct answer from \texttt{read}, and amnesia means that a \texttt{read} may
+return \textsc{nothing} when it shouldn't.
+
+On the other hand, the more complicated method described in the same section
+works correctly even when faced with amnesia, because it must work correctly
+even when the TEM owner \texttt{remove}s associations (intuitively, amnesia
+resembles spurious \texttt{remove}s.) The complicated method works correctly
+becauseit is known that all the SECpacks of an object will issue only
+\texttt{writes}s that return \textsc{updated}, and only \texttt{reads} that do
+not return \textsc{nothing}. Also, all the \texttt{write}s in a constructor
+are guaranteed to return \textsc{created} under normal use, but this condition
+does not need to be verified to insure the correctness of the persistent store
+operations.
+
+\subsubsection{Preventing Amnesia}
+If the persistent store is not allowed to exhibit amnesia, the host must be
+able to prove that an association does not exist in the tree. In order for the
+proof to have an efficient encoding (i.e., not enumerate all the leaves in the
+tree), there must be a single possible path from the root to a leaf containing
+a certain address.
+
+The fixed tree in AEGIS \cite{suh2003aat} trivially meets the requirement
+above, but is not ideally suited for a sparse addressing space, because its
+height is proportional to the number of bits in an address. The issue is
+exacerbated by the pressure of the low-memory TEM environment on the
+tree's branching factor. For example, assuming SHA1 is used for
+hashing, a branching factor of 1,000 would require 20KB of RAM for storing a
+single internal node. 20KB is a luxury in the low-cost chips that the TEM is
+targeting. On the other hand, using a really small branching factor increases
+the tree depth and lowers performance.
+
+A binary search tree is an attractive alternative, especially because the tree
+\emph{does not have to be balanced}. Intuitively, it is safe to assume that the
+tree will perform according to the average-case analysis, because the tree keys
+are encrypted addresses, so they will ``look'' random. Formally, a misbehaving
+SEClosure cannot cause the persistent store to produce a worst-case tree structure, because it cannot guess the addresses that would encrypt to keys that would lead to the worst-case tree structures.
+
+Implementing the binary search trees requires that internal nodes would have to
+be augmented to also store addresses, which is straightforward. An optimized
+implementation will tweak the tree's branching factor to achieve a good
+compromise between the size of an internal node and the tree's height.

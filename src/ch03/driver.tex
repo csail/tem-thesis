@@ -1,0 +1,28 @@
+\section{TEM Host Driver}\label{arch:driver}
+
+The TEM is an add-on to a computer, and therefore requires driver software
+(also called host software) on the host computer. The host software design
+should be easily derived from the design of the TEM it interfaces with. For the
+sake of completeness, this section discusses the main issues encountered during
+the development of the prototype driver.
+
+At a minimum, the TEM host software should provide the following services:
+\begin{itemize}
+  \item {certification;} The TEM is useless unless the driver can produce an
+  Endorsement Certificate that can be used by the TEM's owner to assure
+  $3^\textrm{rd}$ parties that the TEM's PubEK can be trusted.
+  \item {execution;} The TEM provides trusted execution by carrying out
+  instructions contained in bound SECpacks. The host software must be capable
+  of loading a SECpack into the TEM, and retrieveing the execution result from
+  the TEM.
+  \item {key deletion;} As discussed in section \ref{arch:key_store}, the TEM
+  owner must be able to delete keys from the cryptographic engine's store, in
+  order to prevent denial of service attacks.
+  \item {persistent store deletion;} The persistent store architecture may
+  allow the owner to delete associations (section \ref{arch:pstore_freshness}),
+  in order to avoid denial of service attacks from malicious SEClosures. If that
+  is the case, the driver should implement the operation. Furthermore, the
+  driver should keep track of the closure that created each association, and
+  allow the user to make informed decisions when deleting associations.
+\end{itemize}
+

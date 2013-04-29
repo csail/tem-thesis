@@ -1,0 +1,156 @@
+\section{Trusted Execution}\label{concepts:trusted_execution}
+This section argues that trusted execution is equivalent to being able to
+guarantee the integrity and confidentiality of a computation.
+
+Starting out from an intuitive level, I claim that Yu\footnote{Yes, Yu
+is intentionally spelled so that it reads just as \textit{you}.} trusts a
+computer if she has confidence that the computer is doing what she expects it
+to be doing.
+
+For instance, software developers trust their computers to faithfully execute
+their code, and not share it with the outside world. When an issue occurs, the
+cause is assumed to be a bug in the program undergoing development, and the
+average developer never wonders if the CPU did execute the code it was
+given, or if the low-level instructions produced by the compiler or interpreter
+match the source code. On the other hand, if the same software developer plays
+a game over the Internet and is pwned\footnote{loses dramatically}, the first thought that will come to
+her mind will be ``did they use hacks\footnote{modifications to a game's
+executable code which help a player perform better by revealing secret
+information or improving their commands}?!''
+
+Like most other people, Yu naturally trust computers she owns, and she trusts
+the communication between her and a computer in her physical vicinity. However,
+when using a system that is not in the same room (for instance, over the
+Internet), or a system that belongs to someone else, Yu's trust disappears  as
+she is concerned that the computer's owner may tamper with the executable
+instructions or the program's data.
+
+The example above highlights two factors that can make Yu distrust the output
+produced by a system:
+\begin{itemize}
+  \item {physical vicinity;} Unless the computer is close to her, Yu doesn't
+  trust the communication channel. This problem has been solved, and the
+  standardized solutions are SSL \cite{freier1996ssl} and TLS
+  \cite{dierks1999tpv}.
+  \item {ownership;} Yu does not trust computers owned by others.
+  Commodity computers were fundamentally designed to run arbitrary code, and all
+  attempts at building systems that restrict the access of owners to their
+  computers have failed. (and met with huge amounts of protest)
+\end{itemize}
+
+\subsection{Trusting Other People's Computers}\label{concepts:use_model}
+The hard (and therefore interesting) scenario is that Yu needs to perform a
+computation on Mii\footnote{You are right, Mii was intended to read like
+\textit{me}. The name was invented by Nintendo, and is used for player
+avatars on the Wii gaming console.}'s machine, and needs the guarantees of
+trusted execution. From this we can infer the following:
+
+\begin{enumerate}
+  \item {The computation is part of an interaction between Yu and Mii.}
+  Otherwise Yu could have run the code on her own computer that she trusts.
+  \item {Mii has an incentive to complete the interaction between Yu and Mii.} If
+  that is not the case, then Mii has no incentive to run Yu's code on his
+  computer, let alone provide trusted execution guarantees.
+\end{enumerate}
+
+So the process will be carried out as follows:
+\begin{enumerate}
+  \item Yu will package the instructions to carry out the computation she
+  needs in a format suitable for consumption by Mii's TEM.
+  \item Yu will transmit the package to Mii.
+  \item Mii will instruct a TEM attached to his computer to execute the
+  package.
+  \item If Yu needs to know the result of the computation, Mii will transmit
+  this result to Yu.
+\end{enumerate}
+
+The scenario presented above will be referred to as the use model of the TEM,
+because it reflects the way I intend users to interact with the platform.
+
+\subsection{Integrity and Confidentiality}\label{concepts:guarantees}
+
+We start out by defining integrity and confidentiality. Note that the
+definitions assume the context of the use model introduced in section
+\ref{concepts:use_model}.
+
+\begin{definition*}
+Integrity is the guarantee that the computation being carried out on Mii's
+computer  is the one specified or intended by Yu.
+\end{definition*}
+
+Practically speaking, integrity means that Mii should not be able to change the
+computation performed by his computer. Using the bank account example in
+section \ref {concepts:closures} (listing \ref{bank_account:ruby}), Yu would be
+the online banking provider, and Mii would be an account holder in Yu's bank.
+Integrity implies, for instance, that Mii cannot modify the computation in
+\texttt{withdraw} so that balance remains unchanged (and thus gain an infinite
+amount of money).
+
+\begin{definition*}
+Confidentiality is the guarantee that Mii will not learn any information that
+is not explicitly disclosed by Yu, as a result of performing the computation.
+In other words, Yu's secrets will be shielded from Mii.
+\end{definition*}
+
+As an initial motivation for confidentiality, note that computer systems are
+used in a competitive society, so it is unavoidable that computations will
+involve information that should be shielded from some parties.
+
+The rest of this section relies on the intuition and the use model developed so
+far to prove that trusted execution is equivalent to the guarantees of integrity
+and confidentiality. First, I prove that integrity is required by trusted
+computing, then I prove that integrity requires confidentiality. The proofs
+also show how that trust in execution can be asserted based on given integrity
+and confidentiality.
+
+\begin{theorem*}
+Trusted execution requires the guarantee of integrity.
+\end{theorem*}
+
+\begin{proof}
+The use model described in section \ref{concepts:use_model} is assumed. All
+scenarios where the TEM use model holds can be classified into of the following
+categories:
+\begin{enumerate}
+  \item {the computation contains one of Yu's secrets}, so integrity is
+  required, to ensure that the computation isn't transformed in a way that
+  would make the result give Mii information about Yu's secrets (e.g., replace
+  the entire execution with ``\texttt{return \textit{secret}}'').
+  \item {the computation does not act on any of Yu's secrets}, so it must be
+  the case that Mii will contribute some information to the computation, and
+  that Yu needs to trust the final result. If Mii has no contribution, then
+  Yu can execute the computation on her own computer which she trusts. If Yu
+  does not need to trust the final result, it follows that Mii is the only one
+  using the result, therefore Mii can obtain Yu's information (which contains
+  no secrets, according to the hypothesis for this category) and execute it on a
+  computer that Mii alone trusts. This contradicts the hypothesis that trusted
+  execution (as defined in at the beginning of the section) is needed.
+\end{enumerate}
+\end{proof}
+
+\begin{theorem*}
+The integrity guarantee of trusted execution requires confidentiality.   
+\end{theorem*}
+
+\begin{proof}
+Assume that the computation to be performed does not require any secret that
+Mii does not posess. Otherwise, confidentiality is trivially required, because
+the computation's specification includes the requirement of not disclosing the
+secrets.
+
+The Church-Turing thesis (explained in \cite{kleene1952im}) holds for today's
+computers. This has the implication that a very simple computer (a Turing
+machine) can emulate any commodity computer that has been built to date. Since
+all computers can essentially perform the same calculations, it follows that it
+is impossible for Yu to formulate her computation in such a way that carrying
+out the computation on different computers would yield different results. Thus,
+Yu cannot distinguish between the case where Mii would show her the
+genuine result of her computation, and the case where Mii would show her
+maliciously contrived data.
+
+We conclude that if the computation doesn't depend on information that is
+secret from Mii, no proof of integrity can be built. Conversely, proving
+integrity requires information that is secret from Mii, so confidentiality is
+required to ensure that the information stays secret from Mii.
+\end{proof}
+

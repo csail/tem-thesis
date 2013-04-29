@@ -1,0 +1,26 @@
+\section{Demonstration Software}\label{impl:demos}
+The TEM stack described in sections \ref{impl:firmware} - \ref{impl:driver} was
+used to build the following small demonstrations:
+\begin{itemize}
+  \item An OpenSSL \cite{engelschall2001oos} engine using SECpacks as keys.
+  When the engine is asked to generate an asymmetric key, it generates a
+  2048-bit RSA key, and embeds the private key into SEClosures that encrypt,
+  decrypt, and sign their arguments. The OpenSSL engine then performs all the 
+  private key operations using SEClosures.
+  \item A personal DRM system that uses SECpacks to store the authorization
+  information for a media file. The file is broken into fixed-size blocks
+  encrypted with indivual keys. The SEClosure that grants access to a file has a 
+  master key used to generate the decryption keys. The SEClosure also contains
+  code that expresses the permissions that the owner has (e.g., play this song at
+  most 5 times, or distribute it to at most 3 friends.) The TEM provides a secure
+  environment for the execution of the DRM policy code (what permissions a user
+  does), and is intended to be used in conjunction with, not as a replacement
+  for, secure audio playback hardware.
+  \item A distributed file system that uses the TEM to insure the freshness of
+  the file system's extents, which are stored on untrusted media. The servers
+  use SEClosures to implement a trusted monotonic counter.
+\end{itemize}
+
+The demonstrations above show that the implementation described in this chapter
+is functional and delivers acceptable performance. The chosen scenarios do not
+showcase the full potential of the TEM.

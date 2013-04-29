@@ -1,0 +1,87 @@
+% -*- Mode:TeX -*-
+
+%% The documentclass options along with the pagestyle can be used to generate
+%% a technical report, a draft copy, or a regular thesis.  You may need to
+%% re-specify the pagestyle after you \include  cover.tex.  For more
+%% information, see the first few lines of mitthesis.cls. 
+
+%\documentclass[12pt,vi,twoside]{mitthesis}
+%%
+%%  If you want your thesis copyright to you instead of MIT, use the
+%%  ``vi'' option, as above.
+%%
+%\documentclass[12pt,twoside,leftblank]{mitthesis}
+%%
+%% If you want blank pages before new chapters to be labelled ``This
+%% Page Intentionally Left Blank'', use the ``leftblank'' option, as
+%% above. 
+
+\documentclass[12pt,twoside]{mitthesis}
+\usepackage{lgrind}
+\pagestyle{plain}
+
+\usepackage{listings}
+\lstset{numbers=left, frame=lines, tabsize=4, captionpos=b, numberstyle=\tiny}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+%% This bit allows you to either specify only the files which you wish to
+%% process, or `all' to process all files which you \include.
+%% Krishna Sethuraman (1990).
+
+%\typein [\files]{Enter file names to process, (chap1,chap2 ...), or `all' to
+%process all files:}
+\def\files{all}
+\def\all{all}
+\ifx\files\all \typeout{Including all files.} \else \typeout{Including only \files.} \includeonly{\files} \fi
+
+\input{base/theorems}
+
+\begin{document}
+
+\include{base/cover}
+\pagestyle{plain}
+\include{contents}
+
+\include{ch01/intro}
+\include{ch01/outline}
+\include{ch01/motivation}
+\include{ch01/landscape}
+\include{ch01/features}
+
+\include{ch02/concepts}
+\include{ch02/closures}
+\include{ch02/trusted_exec}
+\include{ch02/trust_chain}
+\include{ch02/secs}
+\include{ch02/pstore}
+%\include{ch02/threat_model}
+
+\include{ch03/architecture}
+\include{ch03/crypto}
+\include{ch03/pstore}
+\include{ch03/execution}
+\include{ch03/interface}
+\include{ch03/driver}
+
+\include{ch04/implementation}
+\include{ch04/firmware}
+\include{ch04/rubygem}
+\include{ch04/driver}
+\include{ch04/demos}
+
+\appendix
+\include{app/acronyms}
+%\include{app/tables}
+
+%% This defines the bibliography file (main.bib) and the bibliography style.
+%% If you want to create a bibliography file by hand, change the contents of
+%% this file to a `thebibliography' environment.  For more information 
+%% see section 4.3 of the LaTeX manual.
+\begin{singlespace}
+\bibliography{main}
+\bibliographystyle{plainurl}
+\end{singlespace}
+
+\end{document}

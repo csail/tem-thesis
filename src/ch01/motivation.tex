@@ -1,0 +1,39 @@
+\section{Motivation: the Need for Trusted Computing}\label{intro:motivate}
+
+Research on secure systems under the standard assumptions (no computer in the
+system can be trusted) is hitting a hard ceiling: there is only so much we can do
+without a trusted party in the system. The following cases illustrate this
+point:
+
+\begin{enumerate}
+  \item The SUNDR paper \cite{li2004sud} arguments that fork consistency is
+  the best guarantee a secure system can provide in the absence of an on-line trusted
+  party. Fork consistency means that users are protected from an un-trusted
+  server returning arbitrary data instead of their files, but they are not
+  protected from a server that will return old versions of their files.
+  
+  \item In \cite{castro1pbf}, Castro and Liskov argue that a replicated
+  state machine (the standard architecture for implementing fault-tolerant services) needs 3N+1
+  replicas to survive N byzantine failures. Having trusted parties assist the
+  consensus agreement protocol would reduce the number of replicas to 2N+1
+  (since replicas need to vote on the correct answer). This would greatly
+  reduce both message size and the number of messages needed to achieve N-fault
+  tolerance.
+     
+	\item Peer-to-peer systems like Bittorrent \cite{cohen2003ibr} and Chord
+	\cite{stoica2001csp} eliminate the single-point of failure and scalability concerns of central servers. However, the
+	absence of trusted hosts renders peer to peer architectures unusable for general
+	applications. The most notable example is MMO (Massive Multiplayer Online) games,
+	which would benefit greatly from this technology, but need to withstand
+	sophisticated attacks from players that want to gain unfair advantages.
+	
+	\item Mobile payment systems are gaining traction in the UK
+	\cite{hickins2007mpsgt}, and are well-established methods of payment in South Korea and Japan
+	\cite{bradford:clm}. However, since phones are un-trusted computers,
+	transactions need to happen online, which raises anonymity concerns, and dooms mobile payments to a huge barrier to adoption
+	experienced by any application that needs cooperation from cell-phone service
+	providers.
+\end{enumerate}
+
+The situations presented above are all real problems whose resolution can
+dramatically impact tomorrow’s technology landscape.

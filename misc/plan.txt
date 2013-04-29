@@ -1,0 +1,82 @@
+Overview / Intro
+	Motivation: Need for Trusted Computing
+		cases outlined above
+		
+	Landscape: Existing work
+		Trusted Modules
+			expensive, intended for banking transactions
+		Conventional Smart Cards
+			mature developer kits produced by microsoft (Windows Card)
+			sun/ibm (Java Card), ?? (MultOS Card)
+			popular in GSM SIMs (contact), public transportation (contactless)
+		Secure Tokens
+			most extreme example of pre-built: only does proof of ownership 
+		TPM
+			revolutionary ideas: co-processor to a powerful untrusted platform
+			inexpensive, no export-restricted or patented work in specification
+			problem: fixed-function
+		*** Prior art in TCG
+			AEGIS
+			NSF proposal
+	TEM Overview: features
+		programmable
+		general purpose external storage
+		no need for an external trusted computer
+			*** cite about TPM assumption about LPC and article about how it's broken
+		easy to use
+		drop-in replacement for TPM
+	TEM-enabled applications
+		summary for the application chapter
+			
+
+TEM Concepts
+	Big picture with all the moving parts
+		Introduce the Application
+			Personal Music Store
+		Roles: SECpack emitter, TEM owner1, TEM owner2, offline parts
+			artist wraps song --> encrypted song, master key
+			song distributed via efficient but untrusted methods (i.e. BT)
+
+	A SECpack from a logical perspective
+		
+
+	Threat model
+		Owner trusts comm. channel between owner and TEM
+			can be fixed easily
+			make sure to explain bad guy = owner, not bad guy = someone else
+		Owner doesn't trust SEC issuer
+		SEC issuers don't trust each other
+			SECs should not be able to access each other's internals
+			bad SECs need to fail w/o fucking up the TEM or other SECs
+		SEC issuers don't trust owner
+			doh... it wouldn't be Trusted Computing otherwise right ?
+		not protecting against DOS
+			give pointer on how to fix into implementation (burn into ROM or something)
+
+TEM Architecture	
+	The execution environment
+
+Implementation
+	secure under threat model
+		argue for why that's true
+		describe what's missing for DOS
+	advantage of Ruby: DSL
+		compare a Java SEC with a Ruby SEC
+	javacard implementation
+	    structure: applet, engines
+	    applet flow: apdus
+	    memory management: buffers
+	    crypto: algorithms used
+	    execution: states (attach, exec, detach)
+	    	cannot use bind/unbind, already stolen for SECpack
+	    development support
+	    	sec trace, buffer stat, key stat
+	
+Applications
+	drm
+	mobile payments
+	mobile agents
+	SECpack migration
+	TPM (w/o attestation)
+
+Conclusion, Future Work

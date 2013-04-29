@@ -1,0 +1,102 @@
+\section{Driver Software for the TEM Host}\label{impl:driver}
+The prototype implementation of the TEM's driver is not at all what one would
+expect to find in a driver. The low-level details of communicating with the
+TEM smart card are handled by the \textsc{smartcard} Ruby extension described
+in section \ref{impl:rubygem}. Ruby makes encoding and decoding APDUs trivial,
+as demonstrated by listing \ref{impl:driver_alloc_buffer}, which contains the
+code for allocating a buffer on the TEM. This left time and energy for higher
+level features that are rarely present in production drivers, let alone
+research prototypes.
+
+\lstinputlisting[float=bph, language=Ruby, caption=TEM Buffer Allocation
+Implementation in the Ruby Driver,
+label=impl:driver_alloc_buffer]{code/drv_alloc_buffer.rb}
+
+\subsection{Domain Specific Languages}
+Ruby is a highly dynamic language, and it is very suited for producing DSLs
+(domain-specific languages), as demonstrated in \cite{cuadrado2007bds} and
+\cite{cunningham2007rmr}. DSLs are part of the ``magic'' that is responsible
+for the huge success of the Ruby on Rails \cite{thomas2006awd} framework. The
+TEM driver uses two DSLs directly. A small language describes the primitive
+data types on a TEM, and a second-order DSL\footnote{(a DSL that generates
+another DSL)} expresses all the necessary information for assembling SEClosures.
+
+The primitive data types DSL takes types one-line type definitions and
+produces functions necessary for encoding and decoding numbers corresponding to
+these data types. For instance, the definition for \texttt{byte} at the
+beginning of listing \ref{impl:driver_types_dsl} yields the methods
+\texttt{read\_tem\_byte}, \texttt{to\_tem\_byte}, and
+\texttt{tem\_byte\_length}.
+
+\lstinputlisting[float, language=Ruby, caption=TEM Primitive Data Types
+Expressed using the DSL, label=impl:driver_types_dsl]{code/drv_types_dsl.rb}
+
+The DSL describing the instruction set of the TEM is a second-order DSL. The
+instruction set DSL, illustrated in listing \ref{impl:driver_instructions_dsl},
+constitutes the backbone of the TEM assembler. An instruction definition in the
+DSL contains user-friendly names for the instruction and its parameters, as
+well as precise instructions on how to encode the instruction for the TEM's VM.
+
+\lstinputlisting[float, language=Ruby, caption=Memory Block Instructions
+Expressed using the DSL,
+label=impl:driver_instructions_dsl]{code/drv_instructions_dsl.rb}
+
+The Ruby driver features a state of the art SECpack assembler that supports
+commens, multiple instructions per line, named parameters, named labels,
+human-readable immediates, macros written in Ruby, and line-level debugging
+information (exploited for the advanced developer support described  in section
+\ref{impl:driver_dev_support}). Relating to the bank account example introduced
+in section \ref{concepts:closures}, listing \ref{impl:driver_balance_secpack}
+shows a possibile implementation of the \texttt{balance} SEClosure. The power of
+the assembly language is illustrated well by the SECpack source in listing
+\ref{impl:driver_keygen_secpack}. Most features were obtained at very little
+cost, by using a DSL to represent the assembly language. This DSL is generated
+from the instruction set DSL described above.
+
+\lstinputlisting[float=hbt, language=Ruby,
+caption=Assembly code for \texttt{balance} in the bank account example,
+label=impl:driver_balance_secpack]{code/drv_balance_secpack.rb}
+
+\lstinputlisting[float=hbt, language=Ruby, caption=Assembly Code for
+Key-Generating SECpack, label=impl:driver_keygen_secpack]{code/drv_keygen_secpack.rb}
+
+The set of DSLs presented here made experimenting fun again. Once the code for
+interpreting the DSLs was solid, and the initial definitions were created, it
+became really easy to change the definitions to experiment variations in
+encoding data types or instructions. Because the DSLs are so easy to maintain,
+they have become the authoritative specifications for the TEM's encoding
+mechanisms.
+
+\subsection{Developer Support}\label{impl:driver_dev_support}
+The powerful assembly language described above plays a major role in making it
+easy to develop SEClosures for the TEM. The other two big features are a full
+suite of unit tests, and meaningful translations for SEClosure execution errors.
+
+The TEM driver contains a full\footnote{\texttt{rcov} indicates a line coverage
+of 95\% or above on each Ruby source file.} suite of unit tests, covering both
+driver and firmware code. The unit tests have proven to be a very good
+investment, as they have automated the following tasks:
+\begin{itemize}
+  \item validating the Ruby driver implementation,
+  \item validating any TEM firmware implementation, 
+  \item assessing the suitability of a JavaCard model as a TEM, and
+  \item assessing the compatibility of a smart card reader with the TEM driver
+  stack.
+\end{itemize}
+
+When any of the layers above exhibits a bug, a failing unit test provides a good
+starting point for investigation. However, if the failure is a SEClosure execution exception, the Ruby driver goes one step further, by retrieving the TEM's execution engine status (using the features in section
+\ref{impl:fw_dev_support}), and combining it with line-level debugging
+information. The result is the ability to pinpoint the exact SECpack
+instruction that caused the failure. Listing \ref{impl:driver_exception} shows
+the data obtained from a typical SEClosure execution exception. Quick inspection
+reveals that the exception occured during the \texttt{outw} instruction, and the
+instruction was assembled in file \texttt{test\_exceptions.rb} at line 32. The
+information includes a snapshot of the execution environment at the time of the
+exception.
+
+\lstinputlisting[float, language=Ruby, caption=Debugging Information for a SEClosure Execution Exception, label=impl:driver_exception]{code/drv_exception.txt}
+
+This level of support is hard to find in research prototypes. It is present in
+the TEM's driver because Ruby's dynamic features drove the cost of implementing
+the features below the time that they saved.

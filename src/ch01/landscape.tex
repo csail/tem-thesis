@@ -1,0 +1,145 @@
+\section{Landscape: Related Trusted Computing Work}\label{intro:landscape}
+
+\subsection{Trusted Modules}\label{intro:trusted_modules}
+Secure platforms have been in demand since the advent of computers,
+especially by government intelligence agencies and by the financial industry.
+
+Early solutions for secure platforms were supplied, most notably by IBM, as
+tamper-resistant assemblies that can operate either autonomously or as
+coprocessors for high-end systems. The latest incarnation of these systems is
+the IBM 4764 co-processor \cite{arnold2004ipn}, which is only available for IBM
+servers under custom contracts, which is pretty suggestive of the price range for the system.
+
+The TPM (and its successor, the TEM) will not be in a position to
+replace cryptographic processors anytime soon, as they focus on providing a
+trusted platform at a low cost, which comes at a detriment to performance.
+
+\subsection{Smart Cards}
+Smart cards \cite{hendry2001scs} are secure platforms embedded in thumb-sized
+chips. For handling convenience, the chips are usually embedded in plastic
+sheets that have the same dimensions as credit cards. The same chips, without
+the plastic sheets, are used as Subscriber Identity Modules (SIMs) in GSM
+cellphones. Smart cards have become pervasive, by offering a secure platform at
+a low cost.
+
+The ISO 7816 standard regulates the low-level aspects of
+smart cards \cite{husemann2001ssc}, namely the physical shape and disposition of
+contact points, voltages accepted by the contact points, and the link-layer and network-layer
+communication protocols between the smart card and its host device.
+
+Platforms such as MultOS \cite{maosco:m} and JavaCard
+\cite{microsystems2003jcp} provide a common infrastructure for speeding up
+application development, and allow multiple applications from different vendors
+to coexist securely. However, both of these platforms build monolithic
+applications that are contained and executed completely on the
+smartcard. Given the limited resources available in a smart card chip, the
+approach above places a very low ceiling on the complexity of the applications
+that can be developed.
+
+\subsection{Secure Processors}
+Secure processors represent a different approach to trusted platforms. A secure
+processor costs less than a trusted module because the secure envelope only
+contains the logic found inside CPUs. The AEGIS \cite{suh2003aat} design
+provides a cost-effective method for implementing a secure processor.
+
+Secure processors are much more powerful than the chips found inside
+smart cards, and would be able to power applications that are significantly more
+complex.
+
+
+\subsection{The Trusted Platform Module (TPM)}\label{intro:tpm}
+The TPM is the first security-related computer component that has gained mass
+adoption, and is now included in laptop computers from major manufacturers such
+as Apple and IBM. The important lessons learned from the TPM's strategy are:
+
+\begin {itemize}
+  \item The module specification should focus on the operations it must perform,
+  and on the security requirements for the platform, without dabbling in actual
+  chip design. This allows a variety of implementations coming from different
+  vendors.
+  \item The hardware required to build the module must be so cheap that its
+  price is insignificant relative to the price of the untrusted platform it is
+  attached to. Lack of high financial risk encourages manufacturers to adopt
+  the technology.
+  \item The specification should not use algorithms or concepts covered by
+  export control or technology patents. This way, vendors can design, produce
+  and sell modules anywhere in the world. Furthermore, since algorithms that are
+  not covered by export control can be incorporated into a universal
+  specification, this makes the platform more attractive for application
+  writers.
+\end{itemize}
+
+\subsubsection{Limitations}
+While having the merits of removing a lot of obstacles corresponding to
+political and business practices in the computer manufacturing industry, the
+solution proposed by the Trusted Computing Group is lacking from a technical
+point of view. The TPM is a fixed-function unit, which means it defines a
+limited set of entities (such as shielded locations holding a cryptographic key
+or hash), as well as a closed set of operations that can be performed with the
+primitives (such as using a key to unwrap another key or to sign a piece of
+data). The TCG followed this avenue because it entailed simpler correctness
+proofs and promised to allow really cheap implementations. However, the
+fixed-function approach proved to be a poor match for the use cases envisioned
+by the TCG, which lead to an explosion in the complexity of the TPM
+specification. In response to a complex specification, vendors chose to use
+reasonably sophisticated secure chips borrowed from the smart-card industry.
+
+Furthermore, the vision for the TPM states that that its main goal is to attest
+that the computer it is bound to is running a TCB (trusted computing base, as
+defined in \cite{latham1985ddt} and \cite{lampson:ads}). The TCB notion
+encompasses all software that, once successfully attacked, may impact the
+correctness of computations executed by a program on the computer. The TPM
+design includes the software in the TCB, so a trusted platform needs to run a
+secure boot loader, operating system, and drivers. This is impossible to
+achieve in practice for the following two reasons:
+
+\begin{enumerate}
+  \item The operating systems used in production (Windows, Linux, Mac OSX) have
+  huge amounts of code running with administrative privileges, for performance
+  reasons. It is impractical to analyze and certify such a large codebase,
+  especially given the frequent stream of updates these operating systems
+  expect. As a representative example, the Common Criteria Security Evaluation
+  of Windows 2000 \cite{microsoft2002eal}, \cite{shapiro2003uwe} was completed
+  in October 2002, which was more than one year after the following operating system version was released.
+  \item System drivers are a part of the TCB, even on systems that run driver
+  software in user mode, like MINIX 3 \cite{herder2006msp}. This is
+  because a driver communicates with a hardware device which is connected to
+  the system bus, and therefore has full read/write access to main memory via
+  DMA transfers. This means that a security certification (e.g., the Common
+  Criteria mentioned above) necessarily includes a hardware platform
+  specification. Most systems are not willing to sacrifice agility for
+  security, so large TCBs have proven impractical.
+\end{enumerate}
+
+Last but not least, the Achilles' foot of the TPM architecture is the bond
+between the secure chip that is TPM and its host computer. The nature of the
+bond implementation ultimately determines the security of the entire system,
+because an attacker that compromises the bond can break the attestation system.
+A perfectly secure bond ultimately amounts to enclosing everything connected
+to the main bus in a secure envelope, which yields the expensive systems
+described in section \ref{intro:trusted_modules}. The specification of the TPM
+for PC systems claims that using the LPC (low pin-count) bus
+\cite{intel2002lpc} as the bond is a good compromise between security and cost.
+However, version 1.1 of the TPM specification has been broken by a trivial
+one-wire attack \cite{lawson2007tha} on the LPC bus, and version 1.2 still
+leaves room for a relatively simple attack \cite{lawson2007tha2}.
+
+The TPM is still useful in the absence of trusted software, as shown by works
+like \cite{sarmenta2006vmc}. However, the lack of general-purpose
+computation places very narrow bounds on the applications of the TPM. In
+practice, the chip is most often used to implement a secure key store to be
+used in multifactor authentication, as illustrated by \cite{yoderpkcs11}.
+
+\subsection{The Need for a TEM}
+The Trusted Computing research group at MIT, led by Professor Srinivas Devadas,
+has researched the applications afforded by the TPM, and understood its
+limitations. The group submitted and received funds for a NSF grant proposal
+containing the idea of a Trusted Execution Module that would be similar to the TPM, but provide
+execution capabilites.
+
+The proposal of adding execution capabilities to the TPM mentioned above was
+the seed for this work. My thesis provides the result of exploring the idea
+mentioned above. In the process of turning the idea into a concrete
+implementation, the unnecessarily complex aspects of the TPM's design have been
+discarded, and replaced with new mechanisms that support an elegant execution
+model.

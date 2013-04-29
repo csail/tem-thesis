@@ -1,0 +1,27 @@
+\section{Communication Interface}\label{arch:interface}
+The main component of the TEM's communication interface is a transceiver for
+the communication channel between the TEM and its owner. This channel can be an
+external bus such as the Universal Serial Bus \cite{specification2000r} if
+the TEM is a physically distinct computer add-on, or an internal bus such as
+the PCI local bus \cite{specification1998r} or the LPC (low pin-count) bus
+\cite{intel2002lpc}, if the TEM is included on the system's motherboard.
+
+If the communication channel between the TEM and its owner is insecure, the
+communication interface abstracts this problem away from the rest of the TEM
+modules, by establishing a secure session. The mechanism for establishing the
+secure session is inspired by SSL \cite{freier1996ssl}, but simplified by the
+lack of protocol negotiation. A rough outline of the required steps is:
+\begin{enumerate}
+  \item the TEM sends its Endorsement Certificate,
+  \item the owner validates the Endorsement Certificate and is assured that the
+  Public Endorsement Key (PubEK) belongs to a TEM,
+  \item the owner generates a symmetric encryption key\footnote{if the laws prohibit symmetric
+  encryption, an asymmetric encryption key can be used instead} to be used as a
+  session key,
+  \item the owner encrypts the session key with the TEM's PubEK and sends it to
+  the TEM,
+  \item the TEM uses its Private Endorsement Key (PrivEK) to decrypt the
+  session key, and
+  \item the TEM and the owner use the session key to communicate securely.
+\end{enumerate}
+

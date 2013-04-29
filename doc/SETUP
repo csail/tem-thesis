@@ -1,0 +1,16 @@
+This thesis was written in Eclipse, using the following plug-ins:
+
+CDT: C development
+Available from the Callisto/Europa/whatever Discovery Site.
+
+Aptana Studio: Ruby code editor
+http://update.aptana.com/update/studio/3.2/
+
+Subclipse: SVN integration
+http://subclipse.tigris.org/update_1.2.x
+
+Scheme Way: editing Scheme code
+http://schemeway.sourceforge.net/update-site
+
+Texlipse: Latex IDE
+http://texlipse.sourceforge.net

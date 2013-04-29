@@ -1,0 +1,45 @@
+\section{TEM Features}\label{intro:features}
+The Trusted Execution Module (TEM) was inspired by the Trusted Platform Module,
+and it follows the principles (described in Section \ref{intro:tpm}) that led to
+its widespread adoption.
+
+The breakthrough provided by the TEM is the capability to execute user-provided
+procedures in a trusted environment, for the low price of a commodity chip.
+This makes the TEM capable of revolutionizing consumer software security in
+the same way that the graphical quality of consumer software user interfaces
+was revolutionzed by the switch from fixed-pipeline to programmable GPUs.
+
+Most importantly, the TEM does not require any trusted software outside the
+secured chip. The TPM can make a trusted statement of whether its host computer
+is running trusted software or not. However, the TPM is nearly useless if its
+host is not running trusted software, whereas the TEM considers this state to
+be the normal operation mode.
+
+Since the TEM does not assume trusted software on its host, it does not need to
+certify the host software. Therefore, the TEM hardware does not need to be
+securely bound to its host. This means that a TEM can cost less than a TPM, and
+that existing computers can be enhanced with TEMs via standard extension
+buses, like the USB.
+
+Switching from fixed-function to a programmable architecture provides simpler
+alternatives to the TPM's complex mechanisms. This lowers the barrier to
+designing and producing software that leverages the secure module. The best
+example of the simplifications achieved is replacing the TPM's hierarchical
+storage scheme with a conceptually simple associative memory. Furthermore, key
+migration is removed from the core architecture, as it can be achieved
+completely by user procedures.
+
+The TEM does not trust the authors of the programs it runs. A malicious
+TEM program cannot negatively impact the module it runs on, and it cannot
+interfere with the result of running programs written by other authors. This
+feature implies there is no need for a program certification system, like
+the authentication schemes used on gaming consoles. So the barriers for TEM
+program developers are as low as possible.
+
+Last but not least, the TEM can be used as a drop-in replacement for the TPM,
+in the applications that don't assume trusted software on the host computer.
+Indeed, it is possible to implement the TPM's functionality as user-supplied TEM
+programs, while maintaining the security guarantees provided by TPM chips. This
+can ease the transition from TEMs to TPMs. Note that realistic TPM applications
+cannot assume trusted software on the TPM host, because there is no trusted
+software stack for PC computers.

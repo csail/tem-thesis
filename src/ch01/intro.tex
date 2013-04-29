@@ -1,0 +1,45 @@
+\chapter{Introduction}\label{intro}
+
+The Trusted Execution Module (TEM) is a Trusted Computing Base (TCB) designed
+for the low-resource environments of inexpensive commercially-available secure
+chips. The TEM can execute small computations expressed as compiled closures.
+The TEM guarantees the confidentiality and integrity of both the computation
+process, and the information it consumes and produces. The TEM's guarantees
+hold if the compiled closure author and the TEM owner don't trust each other.
+That is, the TEM will protect the closure's integrity and confidentiality
+against its owner's attacks, and will protect itself (and the other
+compiled closures of the TEM owner) against attacks from a malicious closure
+author.
+
+The TEM executes compiled closures in sequential order, in a tamper-resistant
+environment. The execution environment offered by the TEM consists of a virtual
+machine interpreter with a stack based instruction set, and a single flat
+memory space that contains executable instructions and temporary variables. The
+environment is augmented with a cryptographic engine providing standard
+primitives and secure key storage, and with a persistent store designed to
+guarantee the integrity and confidentiality of the variables whose values must
+persist across closure executions. The persistent store is designed to use
+external untrusted memory, so its capacity is not limited by the small amounts
+of trusted memory available on inexpensive secure hardware.
+
+The TEM's design focuses on offering elegance and simplicity to the software
+developer (the closure author). The instruction set is small and consistent,
+the memory model is easy to understand, and the persistent store has the minimal
+interface of an associative memory. 
+
+The TEM was implemented on a JavaCard smart card that uses the same family of
+secure chips that are employed by Trusted Platform Module (TPM)
+implementations. The TEM's prototype implementation is a living proof that the
+design is practical and economical. The research code implements a full stack
+of TEM software: firmware for the smart card, a Ruby extension for accessing
+PC/SC smart card readers, a TEM driver, and demo software that leverages the
+driver. The protoype implementation leverages the advanced features of the
+Ruby language to provide a state of the art assembler which makes writing
+compiled closuers for the TEM very convenient.
+
+The Trusted Execution Module has a lot of potential to enable new applications,
+by combining the flexibility of a virtual machine guaranteeing trusted
+execution with the pervasiveness of inexpensive secure chips. For example, the
+TEM can bring solutions to the previously unsolved problems of secure mobile
+agents, secure peer-to-peer multiplayer online games, and secure anonymous
+offline payments.

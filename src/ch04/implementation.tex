@@ -1,0 +1,25 @@
+\chapter{Prototype Implementation}\label{impl}
+The Trusted Execution Module is not just a collection of abstract ideas. I have
+implemented the complete TEM architecture described in chapter \ref{arch} in a
+thumb-sized tamper-resistant chip that can be mass-produced at a unit cost of
+less than 5 USD.
+
+The prototype implementation served as a platform for experimentation
+throughout the TEM's development, and provides concrete proof that the
+proposed TEM design is practical.
+
+The prototype TEM implementation consists of the following software modules:
+\begin{itemize}
+  \item The TEM architecure described in chapter \ref{arch} is implemented by
+  the firmware running on the secure chip. The firmware is implemented on
+  top of the JavaCard platform \cite{microsystems2003jcp}, and is described in
+  section \ref{impl:firmware}.
+  \item An extension implementing smartcard access for the Ruby programming
+  language. Section \ref{impl:rubygem} explains the features and motivation
+  for developing the extension. 
+  \item Driver software for the TEM's host computer, implemented in the Ruby
+  programming language \cite{flanagan2008ruby}. Section \ref{impl:driver}
+  describes the advanced features that make this driver implementation unique.
+  \item Demonstration software using the TEM driver, summarized in section
+  \ref{impl:demos}.
+\end{itemize}

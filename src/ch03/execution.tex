@@ -1,0 +1,405 @@
+\section{Execution Engine}\label{arch:execution}
+The execution engine processes SECpacks synchronously, according to
+the following simple loop:
+\begin{enumerate}
+  \item load a SECpack provided by the communication interface,
+  \item carry out the computation expressed in the SECpack,
+  \item provide the computation result to the communication interface, and
+  \item release resources and prepare for the next SECpack.
+\end{enumerate}
+
+\subsection{The TEM Virtual Machine}\label{arch:vm}
+The computation inside a SECpack is expressed as microinstructions
+for a stack-based virtual machine (VM). The virtual machine stores code and data
+in a single, flat memory space (described in detail later). The entire VM
+interpreter state consists of the following registers:
+\begin{enumerate}
+  \item {IP (the instruction pointer)} is the memory address of the instruction
+  that will be executed next, and
+  \item {SP (the stack pointer)} is the memory
+  address of the top of the VM's stack.
+\end{enumerate}
+
+Instructions are encoded as a 1-byte operation code (opcode), optionally
+followed by immediate data. The size of the immediate data following an opcode
+can be determined by looking at the opcode, to make code analysis easy.
+
+The stack has a conventional design: it consists of fixed-size entries, which
+are the size of the machine word. Unless otherwise specified, instructions read
+their inputs by popping entries off the stack, and push their results onto the
+stack.
+
+\subsubsection{Standard Operations}
+The virtual machine has standard instructions for performing arithmetic
+operation, stack manipulation, and execution flow control.
+
+\subsubsection{Single Memory Space}
+The TEM's execution environment provides a single RAM-backed memory space that
+contains the closure's executable instructions, values of local variables and de-facto
+immutable non-local variables, and the virtual machine's stack.
+
+Although the TEM's VM has a stack-based instruction set, closures have
+unrestricted access to the memory space. This offers maximum flexibility (e.g.,
+self-modifying code) that closure compilers can use to squeeze one last drop
+of performance out of the execution engine.
+
+\subsubsection{The Output Buffer}
+The output buffer is an append-only memory zone, and its role is to make
+building secure closures easier. If a closure terminates successfully by
+executing \texttt{halt}, the contents of the output buffer is returned as the
+result of the execution. In case an exception occurs during execution, nothing
+is returned. Therefore, the output buffer is intended to help developers build
+secure closures, by demanding that they make an active effort to report a piece
+of data as a result.
+
+\subsubsection{Persistent Storage Interface}
+The contents of mutable non-local variables is stored in the TEM's persistent
+store (sections \ref{concepts:pstore} and \ref{arch:pstore}) between
+executions. Addresses are stored in memory space, and values are transferred
+between the memory space and the persistent store. The instructions for working
+with the persistent store closely mirror the interface presented in
+section \ref{arch:pstore}.
+
+\subsubsection{Cryptographic Engine Interface}
+The execution engine offers interfaces to all the functions of the
+cryptographic accelerator described in section \ref{arch:crypto}.
+
+A closure is automatically authorized to use all the encryption keys that it
+creates. The SEClosure can use keys that are already loaded in the cryptographic
+engine, once it demonstrates knowledge of their authorization secret. The
+execution engine enforces these restrictions by keeping track of the keys that
+the closure is authorized to use. If a closure attempts to use a key before
+gaining authorization, its execution is aborted. The execution engine
+also keeps a list of the temporary keys produced by a SEClosure, and removes them at the end of the closure's execution.
+
+Keys in the cryptographic engine's store are identified by the number of the
+slot storing them. Unless otherwise specified, the cryptographic instructions
+read/write key identifiers from/to the VM stack.
+
+\subsection{Design Philosophy}\label{arch:vm_philosophy}
+This section describes the issues encountered in the design the TEM's
+execution engine, and explains the reasoning behind the trade-offs that were
+made.
+
+\subsubsection{Motivation for Synchronous Execution}
+The execution engine design completely discards any possibility of concurrent
+execution. The factors driving this decision are:
+\begin{itemize}
+  \item Concurrent programming is notoriously hard to get right, so
+  applications demanding provable security tend to forgo the speed benefit
+  anyway.
+  \item At the time of this writing, all existing low-cost secure chips contain
+  a single general-purpose execution core, so provisions for concurrent
+  executions would not be readily applicable.
+  \item A multi-core TEM can be modeled as multiple execution engines that
+  share a persistent store. The consistency of the persistent store is ensured 
+  by treating each SECpack execution as a transaction. This design is much
+  easier to implement correctly, as it relies on heavily-studied techniques
+  from the database world.
+\end{itemize}
+
+\subsubsection{Motivation for the Single Memory Space}
+The clear separation between the RAM-backed memory space and the consistent
+store provides optimum performance in low-resource environments. Most
+operations reference RAM memory, which yields speed and increases EEPROM
+lifetime.
+
+Since the single memory space contains a closure's code, allowing unrestricted
+access to that memory space makes static verification techniques (used in the
+Java Virtual Machine) impossible to apply. This is not an issue for the TEM, as
+the target hardware does not have the resources needed for static verification,
+so dynamic verification is unaviodable.
+
+The TEM would not benefit from a more complex memory scheme. Segmented memory
+would not be useful, since the execution engine is synchronous, so code sharing
+cannot occur. Paged memory is also not interesting, because the TEM does not
+have multiple code privilege levels, or virtual memory.
+
+\subsubsection{Motivation for a Virtual Machine}\label{arch:vm_motivation}
+Using a virtual machine carries a price in performance, but makes the the executable code in a SECpack universal. Having SECpack executable code
+target specific hardware introduces complexity (multiple target platforms) for
+the closure compiler, and blocks SECpacks from being migrated among TEMs.
+
+The TEM's virtual machine plays a bigger role in execution speed than commodity
+VMs that are targeted towards desktop computers (e.g., the Java Virtual Machine
+\cite{lindholm1999jvm}, and ECMA Common Intermediate Language
+\cite{standard2001cli}) because the TEM is not powerful enough to perform
+Just-In-Time Compilation (JIT). Thus, on the TEM, even performance-critical
+code is running under the VM interpreter, whereas desktop virtual machines
+can translate ``hot'' code to the hardware's native instruction set.
+
+On the other hand, the performance degradation introduced by the virtual machine
+has no significant impact on most TEM applications. Assuming a reasonable VM
+implementation, a single asymmetric key encryption operation dwarfs the cost of
+interpreting thousands of VM instructions. Public-key encryption is invoked
+for every bound SECpack, because a part of the SECpack must be decrypted with
+the TEM's Private Endorsement Key.
+
+\subsubsection{Motivation for a Stack-Based Instruction
+Set}\label{arch:stack_motivation}
+Having established that the TEM will use a virtual machine makes the
+decision of using a stack-based instruction set relatively straight-forward.
+
+Stack-based instruction sets are easy to generate from ASTs (Abstract Syntax
+Trees), and are a decent intermediate representation for code analysis
+algorithms. Stack-based instruction sets also yield the smallest possible code.
+If JIT (Just-in Time Compiling) becomes a possibility, simple register
+allocators can turn stack-based code into native code with very good
+performance. 
+
+Using a register-based instruction set doesn't make much sense for an
+interpreted virtual machine. The real processor registers are likely to be used
+up by the VM interpreter, so virtual registers would end up being simulated by
+RAM, which results in the same speeds seen by stack-based languages, at the
+cost of a more complex implementation.
+
+Stack-based instruction sets are used in recent VMs for both medium-level
+languages (e.g., the Java Virtual Machine \cite{lindholm1999jvm}) and high-level
+languages (the Ruby 1.9 VM \cite{sasada2005yya}).
+
+\subsubsection{Considerations in the Design of the Instruction
+Set}\label{arch:vm_instructions}
+The standard instructions are heavily inspired by the Java Virtual Machine
+\cite{lindholm1999jvm}. The TEM-specific instructions (cryptography and
+persistent store) have been developed trying to apply the same principles.
+
+The instruction set tries to strike a balance between enabling small SECpacks
+and keeping the VM interpreter simple. For example, most instructions operating
+on memory blocks have two variants. The fixed block variant (instructions ending
+in \texttt{fxb}) receives the information about the blocks (address, and
+optionally length) as immediate data, which optimizes SECpack size. The
+variable block variant (instructions ending in \texttt{vb}) pops the block
+information off the stack, for maximum efficiency when working with
+variable-length memory structures. Exceptions were made for instructions that
+would not occur often in a SECpack (e.g., \texttt{rnd}), so the space savings
+do not warrant the extra complexity in the interpreter.
+
+The design of the TEM-specific instructions was biased by my laziness which
+pushed me to keep the prototype implementation simple.
+
+The instruction set aims for consistency with respect to mnemonics and
+order of parameters. A few examples:
+\begin{itemize}
+  \item \texttt{ld} (load) instructions push data on the stack, and \texttt{st}
+  (store) instructions write data to the memory space,
+  \item \texttt{fxb} (fixed-block) instructions receive their parameters in the
+  same order that they should be pushed on the stack for the corresponding
+  \texttt{vb} (variable-block) instructions, and
+  \item instructions that receive the same parameters (e.g., \texttt{mcfxb} and
+  \texttt{mcpyfxb}) have the same parameter order.
+\end{itemize}
+Aside from making the VM easier to understand, consistency can be leveraged
+to optimize the interpreter code.
+
+\subsection{The SECpack Loader}\label{arch:secpack_loader}
+A SECpack consists of a snapshot of the initial state of the virtual machine's
+memory space, together with a header containing a magic value, the initial
+values for the VM's instruction pointer and stack pointer, and data needed to
+decrypt a bound SECpack. This makes virtual machine setup trivial, given an
+unbound SECpack.
+
+A bound SECpack (section \ref{concepts:secpack_binding}) requires that the
+loader decrypts the private information $\mathcal{P}$ and verifies the
+integrity of the shared information $\mathcal{S}$. The process for doing this
+is straightforward, and implies reversing the steps of the binding process
+described in section \ref{concepts:secpack_binding}. The SECpack header
+contains the sizes of the $\mathcal{S}$ and $\mathcal{P}$ areas, and an unbound
+SECpack is indicated by an empty $\mathcal{P}$ area.
+
+When the SECpack loader is invoked, it is given the SECpack and the number of
+a slot in the cryptographic engine's key store. The key in that slot is used to
+decrypt the SECpack. The loader must reject bound SECpacks that fail the
+integrity check $\mathcal{H} = h(\mathcal{S} || \mathcal{P})$.
+
+The ability of using arbitrary keys (as opposed to PrivEK alone) for decrypting
+SECpacks allows for speed optimizations and extensions to the TEM's chain of
+trust. For example, an often-used set of SECpacks can be bound to a TEM using a
+symmetric key instead of PubEK, if the key is transmitted securely to the
+TEM by encrypting it with PubEK. This can significantly decrease execution time
+by avoiding an asymmetric-key decryption operation every time the SECpacks are
+loaded.
+
+The TEM trust chain is not compromised by allowing arbitrary keys to be
+used as SECpack decryption keys, because of the integrity check that occurs after
+SECpack decryption, and because of the magic value in the header. 
+
+\subsection{The TEM Instruction Set}
+For the sake of completeness, this section briefly describes the instructions
+that make up the VM Instruction Set. Although the instruction set is usually
+considered an implementation detail, the VM's instruction set is necessarily a
+part of the TEM's architecture. All TEMs, regardless of the hardware
+implementation, will have to implement the same instruction set. The
+instruction set presented here is not completely optimized, but it is a good
+starting point, as it is working well in the prototype TEM implementation. 
+
+The instructions are a straightforward application of the design principles set
+forth in section \ref{arch:vm_philosophy}, combined with bits shamelessly
+stolen from the other architectures I have worked with. Most readers can safely
+skip this section.
+
+\subsubsection{Standard Operations}
+The standard instructions, classified by their purpose, are:
+\begin{itemize}
+  \item arithmetic operations; \texttt{add}, \texttt{sub} (subtract),
+  \texttt{mul} (multiply), \texttt{div} (division quotient), \texttt{mod}
+  (division reminder) perform respective arithmetic operation on the top two
+  numbers in the stack, and push the result on the stack.
+  \item flow control; \texttt{halt} marks the successful completion of a
+  closure's execution. \texttt{jmp} changes the value of the IP register
+  (``jumps'') unconditionally, as opposed to the conditional jump instructions that only change IP if the value at the top of the stack meets the condition in the instruction name. The conditional jumps are (unsurprisingly) \texttt{jz} (jump if zero), \texttt{jnz} (jump if not zero),
+  \texttt{ja} (jump if above zero), \texttt{jb} (jump if below zero),
+  \texttt{jae} (jump if above or equal to zero), and \texttt{jbe} (jump if
+  below or equal to zero). The new IP value is encoded as immediate data for
+  each of the flow control instructions.
+  \item stack manipulation; \texttt{ldbc} (sign-extend and load/push a 1-byte
+  constant), \texttt{ldwc} (load/push a 1-word constant), \texttt{pop} (pop one
+  item), \texttt{popn} (pop $N$ items), \texttt{dupn} (duplicate the top $N$
+  items), \texttt{flipn} (reverse the order of the top $N$ items) are rather
+  straightforward. Constants are encoded as immediate data. $N$ is considered a
+  constant encoded as 1-byte unsigned number.
+\end{itemize}
+
+\subsubsection{Single Memory Space}
+The following instructions for interfacing with the memory space take one
+immediate value, which is the address that they read from / write to.
+\begin{itemize}
+  \item \texttt{ldb} (load byte): sign-extends and loads/pushes a byte in the
+  memory space
+  \item \texttt{ldw} (load word): loads/pushes a word beginning at the
+  given address in the memory space
+  \item \texttt{stb} (store byte): pops the top word off the stack and stores 
+  its least-significant byte in the memory space
+  \item \texttt{stw} (store word): pops the top word off the stack and stores
+  it beginning at the given address in the memory space
+  \item \texttt{mcfxb} (memory-copy, fixed block): copies a memory block
+  (contiguous sequence of bytes) to another memory location; the operation
+  parameters (address and length of the source block, address where the block
+  will be copied) are encoded as word-sized immediate values
+  \item \texttt{mcvb} (memory-copy, variable block): analogous to
+  \texttt{mcfxb} that pops the operation parameters off the stack
+  \item \texttt{mcmpfxb}, \texttt{mcmpvb} (memory-compare, fixed /
+  variable blocks): lexicographically compare the contents of two memory blocks
+  and store the comparison result on the stack; the buffers are identified
+  using the same parameters as in \texttt{mcfxb}, and respectively \texttt{mcvb}
+\end{itemize}
+
+The instructions \texttt{ldbv} (load byte from variable address), \texttt{ldwv}
+(load word from variable address), \texttt{stbv} (store byte at variable
+address), and \texttt{stwv} (store word at variable address) behave similarly
+to the instructions explained above, but they use the stack to read the
+memory address that they will operate on. These instructions are useful when
+dealing with variable-size data structures.
+
+\subsubsection{The Output Buffer}
+The instructions interfacing with the output buffer are:
+\begin{itemize}
+  \item \texttt{outnew} (new output buffer): creates the output buffer for a
+  SEC; reads the word from the top of the stack as an upper limit of the number
+  of bytes that will be written to the output buffer (an exception will be
+  generated if the SEC exceeds the limit)
+  \item \texttt{outb}, \texttt {outw} (output byte / word): same behavior as
+  \texttt{stb}, \texttt{stw} except they target the output buffer
+  \item \texttt{outfxb}, \texttt{outvb} (output fixed / variable block): same
+  behavior as \texttt{mcfxb}, \texttt{mcvb}, except the destination is the
+  output buffer
+  \item \texttt{outvlb} (output variable-length block): a compromise between
+  \texttt{outfxb} and \texttt{outvb} -- the address of the source memory buffer
+  is fixed (encoded as immediate data), but the length is obtained from the
+  stack
+\end{itemize}
+
+As a further optimization on SECpack size, a destination address equal to the
+maximum word size (i.e., \texttt{0xFFFF} on 16-bit processors) is interpreted
+as ``the destination is the output buffer''.
+
+\subsubsection{Persistent Storage Interface}
+The instructions for interfacing with the persistent store are:
+\begin{itemize}
+  \item \texttt{pswrfxb}, \texttt{pswrvb} (persistent store write using
+  fixed/variable blocks): write a value from the memory space into the
+  persistent store. Their parameters are the addresses of the memory blocks 
+  containing the persistent store address and the value to be written. The
+  instructions map to the \texttt{write} method presented in \ref{arch:pstore}.
+  \texttt{pswrvb} has variable parameters (coming from the stack), whereas
+  \texttt{pswrfxb} uses fixed parameters (encoded as immediate values).
+  \item \texttt{psupfxb}, \texttt{psupvb} (persistent store update using
+  fixed/variable blocks): similar to \texttt{pswrfxb}, \texttt{pswrvb}, but abort
+  execution if the persistent store had no association for the given address (the
+  underlying \texttt{write} would have returned \textsc{created})
+  \item \texttt{psrdfxb}, \texttt{psrdvb} (persistent store read using
+  fixed/variable blocks): read a value from the persistent store into the
+  memory space. The parameters mirror \texttt{pswrfxb}, and respectively
+  \texttt{pswrvb}. An execution is generated if the persistent store does not
+  have a value associated with the given address.
+  \item \texttt{pshk} (persistent store has key): looks up an address in the
+  persistent store. The persistent store address is stored in a variable block
+  (its location in memory space is read from the stack). The result is
+  \texttt{1} if the persistent store contains an association for the given
+  address, and \texttt{0} otherwise. The result is pushed on the stack.
+  \item \texttt{psrm} (persistent store remove): removes a value from
+  the persistent store, using the semantics of \texttt{remove} in
+  \ref{arch:pstore}. The only parameter is the address of memory block
+  containing the peristent store address. The parameter is read from the stack.
+\end{itemize}
+
+\subsubsection{Cryptographic Engine Interface}
+The following instructions manage the encryption keys for the algorithms 
+covered in sections \ref{arch:crypto_asymmetric} and
+\ref{arch:symmetric_crypto}:
+\begin{itemize}
+  \item \texttt{genk} (generate key): generates a symmetric or asymmetric
+  encryption key. The desired key type is encoded as a 1-byte immediate value.
+  Upon successful completion, the instruction will push on the stack the
+  slot/slots holding the generated key (an asymmetric key requires two slots).
+  \item \texttt{relk} (release key): unloades a key from the crypto store.
+  \item \texttt{ldkl} (load key length): pushes on the stack an upper bound for
+  the length (in bytes) required to hold the serialized version (via
+  \texttt{stk}) of a key.
+  \item \texttt{rdk} (read key): creates a crypto store key by reading
+  a serialized version (via \texttt{stk}) of the key from a memory block. The
+  address of the memory block is popped from the stack. Upon success, pushes the
+  number of the slot holding the new key on the stack.
+  \item \texttt{stk} (store key): writes a serialized version of a key into the
+  memory space. The address of the memory block and the slot number are read
+  from the stack.
+  \item \texttt{authk} (authorize key): pops off the stack a slot number and
+  the address of a memory block containing an authorization secret. If the slot
+  contains a temporary key, it is made persistent by attaching the authorization
+  secret. Otherwise, the authorization secret is presented to gain access to
+  the key. An execution exception occurs if the presented secret does not match
+  the authorization secret associated with the key.
+\end{itemize}
+
+The encryption keys can be used to:
+\begin{itemize}
+  \item encrypt and decrypt data, via \texttt{kefxb}, \texttt{kevb},
+  \texttt{kdfxb} and \texttt{kdvb} (keyed encrypt/decrypt using fixed/variable
+  memory blocks), and
+  \item produce and verify signatures, via \texttt{ksfxb}, \texttt{ksvb},
+  \texttt{kvsfxb} and \texttt{kvsvb} (keyed sign/verify signature using
+  fixed/variable memory blocks).     
+\end{itemize}
+The instructions above take the following parameters: the slot number of the
+key to be used (always read from the stack), the address and length of the
+block of data to be used as input, and the address where the output shall be
+written. The last three parameters can be fixed (encoded as immediate values) or
+variable (read from the stack).
+
+The hashing function (section \ref{arch:crypto_hash}) in the cryptographic
+engine is accessed by the instructions \texttt{mdfxb}, and \texttt{mdvb}
+(message-digest using fixed/variable blocks). The instructions resemble those
+for copying memory blocks (\texttt{mcpyfxb}, and \texttt{mcpyvb}) but, instead
+of writing a copy of the source block, they write a cryptographic hash (also
+known as a message digest) of the source block.
+
+The random number generator (section \ref{arch:crypto_rng}) is invoked by the
+instruction \texttt{rnd} (random), which writes random data to the memory
+space. \texttt{rnd}'s two parameters are read from the stack, and they indicate
+the desired number of random bytes, and the memory address where the random
+bytes will be written.
+
+Encryption keys are stored by the cryptographic engine. A closure's memory
+space may contain serialized encryption keys, but these keys have to be loaded
+into the cryptographic engine before they can be used in cryptographic
+operations. If a TEM can generate encryption keys, the VM provides instructions
+for serializing the keys into the running closure's memory space. 

@@ -1,0 +1,42 @@
+\chapter{TEM Concepts}\label{concepts}
+
+This chapter introduces the concepts used in the Trusted Execution Module. It
+defines ambiguous or obscure terms, and explains the big-picture ideas
+behind the TEM.
+
+The TEM is a very small TCB (Trusted Computing Base) which can be enclosed in a
+tamper-resilient envelope at commodity prices. The platform provides the
+guarantees associated with trusted execution, even if the user requiring
+trusted execution is not the TEM's owner.
+
+The TEM's execution primitive is the closure. Section \ref{concepts:closures}
+explains the benefits and research behind the decision.
+
+The TEM provides the possibility of trusted execution on computers outside
+one's ownership. Section \ref{concepts:trusted_execution} analyzes the
+definition of trusted execution and explains the family of situations in which
+the TEM can add value.
+
+The root of trust in the TEM is an Endorsement Certificate produced by a
+TEM's manufacturer, asserting that a public key (the Public Endorsement Key)
+corresponds to a private key that is only known to unique TEM. Section
+\ref{concepts:trust_chain} explains the chain of trust that leads to this
+assertion.
+
+Closures are transmitted to the TEM in a binary format that is convenient for
+the TEM to process. Section \ref{concepts:secure_closures} begins with
+by classifying the pieces of information inside a closure according to the
+required guarantees. The bulk of the section is dedicated to introducing a
+cryptography-based process that guarantees the confidentiality and integrity of
+a closure's contents, as it is transmitted via unsafe channels to the TEM.
+
+Closures can use non-local mutable variables, whose values must persist
+across closure executions. The TEM stores all these values in an associative
+memory. Addresses are the same size as encryption keys, so the knowledge of a
+variable's address serves as proof of authorization to access the variable's
+value. This rather unconventional design is covered in section
+\ref{concepts:pstore}, where I argue for its robustness and minimality.
+
+% Finally, section \ref{concepts:threat_model} explains the threat model under
+% which the TEM functions.
+

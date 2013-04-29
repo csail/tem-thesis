@@ -1,0 +1,16 @@
+Tem::SecExecError: SEClosure execution failed on the TEM
+TEM Trace: ip=0009 sp=000a out=0002 psaddr=000000000000000000000000,
+psval=000000000000000000000000
+TEM Buffer Status:
+{:free => {:persistent=>8256, :clear_on_reset=>2057,
+           :clear_on_deselect=>2057},
+ :buffers => {0=>{:type=>:clear_on_reset, :pinned=>true, :length=>2},
+              1=>{:type=>:clear_on_reset, :pinned=>false, :length=>20}}}
+TEM Key Status:
+{:keys => {}}
+
+    ./lib/tem/procs.rb:123:in `outw'
+	test/test_exceptions.rb:32:in `test_trace'
+    ./lib/tem/procs.rb:139:in `assemble'
+    ./lib/tem/procs.rb:256:in `assemble'
+	test/test_exceptions.rb:25:in `test_trace'
